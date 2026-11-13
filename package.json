@@ -4,7 +4,7 @@
   "description": "ADEY Ethiopian Foreign Exchange Intelligence Platform",
   "main": "index.js",
   "scripts": {
-    "build": "echo 'Build successful'"
+    "build": "echo 'Static & Serverless build ready'"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.8"
