@@ -2,5 +2,11 @@
   "outputDirectory": ".",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" }
+  ],
+  "crons": [
+    {
+      "path": "/api/scrapers/collect",
+      "schedule": "0 8 * * *"
+    }
   ]
 }

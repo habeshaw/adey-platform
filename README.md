@@ -1,6 +1,6 @@
 # ADEY — Ethiopian Foreign Exchange Intelligence Platform
 
-Production-grade bilingual (English & Amharic) web application for collecting, archiving, analyzing, and distributing foreign exchange rates from the National Bank of Ethiopia (NBE) and all Ethiopian commercial banks.
+Production-grade bilingual (English & Amharic) web application for collecting, archiving, analyzing, and distributing foreign exchange rates from the National Bank of Ethiopia (NBE) and all Ethiopian commercial banks, with automated daily Vercel Cron data collection.
 
 ## Quick Setup Instructions
 1. **Supabase Database**: Run `database/schema.sql` and `database/rls_policies.sql` in your Supabase SQL Editor.
