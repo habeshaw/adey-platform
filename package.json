@@ -1,0 +1,19 @@
+{
+  "name": "adey-financial-platform",
+  "version": "1.0.0",
+  "description": "ADEY Ethiopian Foreign Exchange Intelligence Platform",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static & Serverless build ready'"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.8"
+  },
+  "devDependencies": {
+    "vercel": "^33.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
