@@ -1,378 +1,491 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ADEY | Ethiopian Foreign Exchange Intelligence Platform</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-900 font-sans min-h-full flex flex-col">
   <!-- Header -->
-  <header class="bg-slate-900 text-white shadow-md">
+  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
     <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
       <div class="flex items-center space-x-3">
         <span class="text-2xl font-black tracking-wider text-amber-400">ADEY</span>
-        <span class="text-xs uppercase bg-slate-800 px-2 py-1 rounded text-slate-300 font-medium">FX Intelligence</span>
+        <span class="text-xs uppercase bg-slate-800 px-2 py-1 rounded text-slate-300 font-medium" data-i18n="tagline">Ethiopian FX Intelligence</span>
       </div>
-      <div id="auth-nav" class="flex items-center space-x-4">
+      <nav class="hidden md:flex items-center space-x-6 text-sm">
+        <button onclick="switchTab('home')" class="hover:text-amber-400 transition" data-i18n="nav_home">Home</button>
+        <button onclick="switchTab('rates')" class="hover:text-amber-400 transition" data-i18n="nav_rates">Daily FX Rates</button>
+        <button onclick="switchTab('comparison')" class="hover:text-amber-400 transition" data-i18n="nav_comparison">Bank Comparison</button>
+        <button onclick="switchTab('importer')" class="hover:text-amber-400 transition" data-i18n="nav_importer">Importer Intelligence</button>
+        <button onclick="switchTab('exporter')" class="hover:text-amber-400 transition" data-i18n="nav_exporter">Exporter Intelligence</button>
+        <button onclick="switchTab('reports')" class="hover:text-amber-400 transition" data-i18n="nav_reports">Reports & Subscriptions</button>
+        <span id="admin-nav-link" class="hidden">
+          <button onclick="switchTab('admin')" class="text-amber-400 font-bold hover:underline" data-i18n="nav_admin">Admin Console</button>
+        </span>
+      </nav>
+      <div class="flex items-center space-x-4">
+        <select id="lang-switcher" onchange="changeLanguage(this.value)" class="bg-slate-800 text-slate-200 text-xs px-2 py-1.5 rounded border border-slate-700 focus:outline-none">
+          <option value="en">English</option>
+          <option value="am">አማርኛ (Amharic)</option>
+        </select>
         <span id="user-display" class="text-sm text-slate-300 hidden"></span>
-        <button id="logout-btn" onclick="logout()" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded hidden transition">Sign Out</button>
+        <button id="auth-btn" onclick="openAuthModal()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-4 py-1.5 rounded text-xs transition" data-i18n="btn_login">Login / Register</button>
+        <button id="logout-btn" onclick="logout()" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded hidden transition" data-i18n="btn_logout">Sign Out</button>
       </div>
     </div>
   </header>
 
   <!-- Main Content Container -->
   <main class="flex-grow max-w-7xl mx-auto px-4 py-8 w-full">
-    <!-- Hero / Title -->
-    <div class="mb-8 text-center">
-      <h1 class="text-3xl font-extrabold text-slate-900 mb-2">Ethiopian Foreign Exchange Intelligence Platform</h1>
-      <p class="text-slate-600 max-w-2xl mx-auto">Providing verified daily exchange rates, bank comparative analytics, and professional intelligence reports for NBE and commercial banks.</p>
-    </div>
-
-    <!-- Dynamic App View -->
-    <div id="app-view">
-      <!-- Loading State -->
-      <div id="loading-view" class="text-center py-12">
-        <p class="text-slate-500 animate-pulse">Initializing ADEY Secure Session...</p>
-      </div>
-    </div>
+    <div id="app-view"></div>
   </main>
+
+  <!-- Auth Modal -->
+  <div id="auth-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative">
+      <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+      <div class="flex border-b border-slate-200 mb-6">
+        <button onclick="setAuthMode('signin')" id="tab-signin" class="w-1/2 pb-3 font-bold text-sm text-center border-b-2 border-amber-500 text-amber-600" data-i18n="auth_signin">Sign In</button>
+        <button onclick="setAuthMode('signup')" id="tab-signup" class="w-1/2 pb-3 font-bold text-sm text-center border-b-2 border-transparent text-slate-400" data-i18n="auth_register">Register New</button>
+      </div>
+      <div id="auth-form-container"></div>
+    </div>
+  </div>
 
   <!-- Footer -->
   <footer class="bg-slate-900 text-slate-400 text-center py-6 text-xs border-t border-slate-800 mt-auto">
     <p>&copy; 2026 ADEY Financial Intelligence Platform. All rights reserved.</p>
   </footer>
 
-  <!-- Application Logic -->
   <script>
-    // Configuration: Replace with your actual Supabase URL and Publishable/Anon Key
     const SUPABASE_URL = 'https://etjsxlbuqiqhvvqjcskt.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_QHTqiLP1-wZtirWkFPPchA_U-mq6xJa';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let currentUser = null;
     let currentProfile = null;
+    let currentLang = 'en';
+
+    const translations = {
+      en: {
+        tagline: "Ethiopian FX Intelligence",
+        nav_home: "Home",
+        nav_rates: "Daily FX Rates",
+        nav_comparison: "Bank Comparison",
+        nav_importer: "Importer Intelligence",
+        nav_exporter: "Exporter Intelligence",
+        nav_reports: "Reports & Subscriptions",
+        nav_admin: "Admin Console",
+        btn_login: "Login / Register",
+        btn_logout: "Sign Out",
+        auth_signin: "Sign In",
+        auth_register: "Register New",
+        hero_title: "Ethiopian Foreign Exchange Intelligence Platform",
+        hero_subtitle: "Providing verified daily exchange rates across NBE and all commercial banks, bank comparative analytics, and professional intelligence reports.",
+        explore_rates: "View Daily FX Rates",
+        compare_banks: "Compare Bank Rates",
+        latest_nbe: "Latest NBE Indicative Rates",
+        public_preview_notice: "Limited public preview. Register and subscribe for full comparative analytics, historical archives, and downloadable reports."
+      },
+      am: {
+        tagline: "የኢትዮጵያ የውጭ ምንዛሬ መረጃ",
+        nav_home: "መነሻ",
+        nav_rates: "ዕለታዊ የምንዛሬ ተመኖች",
+        nav_comparison: "የባንኮች ንጽጽር",
+        nav_importer: "ለአስመጪዎች መረጃ",
+        nav_exporter: "ለላኪዎች መረጃ",
+        nav_reports: "ሪፖርቶች እና ምዝገባ",
+        nav_admin: "የአስተዳዳሪ ማዕከል",
+        btn_login: "ግባ / ይመዝገቡ",
+        btn_logout: "ውጣ",
+        auth_signin: "ግባ",
+        auth_register: "አዲስ መለያ ፍጠር",
+        hero_title: "የኢትዮጵያ የውጭ ምንዛሬ መረጃ እና ትንተና መድረክ",
+        hero_subtitle: "ከብሔራዊ ባንክ እና ከሁሉም ንግድ ባንኮች የተረጋገጡ ዕለታዊ የምንዛሬ ተመኖችን፣ የባንክ ንጽጽሮችን እና ሙያዊ ሪፖርቶችን ያግኙ።",
+        explore_rates: "ዕለታዊ ተመኖችን ይመልከቱ",
+        compare_banks: "የባንክ ተመኖችን አወዳድር",
+        latest_nbe: "የብሔራዊ ባንክ የዕለቱ ማጣቀሻ ተመኖች",
+        public_preview_notice: "ይህ የተወሰነ የህዝብ እይታ ነው። ሙሉ ንጽጽሮችን እና ሪፖርቶችን ለማግኘት ይመዝገቡ።"
+      }
+    };
+
+    function changeLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('adey_lang', lang);
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang][key]) el.innerText = translations[lang][key];
+      });
+      if (currentProfile) {
+        supabaseClient.from('profiles').update({ preferred_language: lang }).eq('id', currentUser.id);
+      }
+    }
 
     async function initApp() {
+      const savedLang = localStorage.getItem('adey_lang') || 'en';
+      document.getElementById('lang-switcher').value = savedLang;
+      changeLanguage(savedLang);
+
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (session) {
         currentUser = session.user;
-        await fetchProfileAndRender();
-      } else {
-        renderAuthView('signin');
-      }
-    }
-
-    async function fetchProfileAndRender() {
-      try {
-        const { data: profile, error } = await supabaseClient
-          .from('profiles')
-          .select('*')
-          .eq('id', currentUser.id)
-          .single();
-
-        if (error || !profile) {
-          currentProfile = { id: currentUser.id, email: currentUser.email, role: 'customer', full_name: 'Valued Customer' };
-        } else {
-          currentProfile = profile;
+        const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', currentUser.id).single();
+        currentProfile = profile || { role: 'customer', full_name: currentUser.email };
+        if (currentProfile.preferred_language) {
+          document.getElementById('lang-switcher').value = currentProfile.preferred_language;
+          changeLanguage(currentProfile.preferred_language);
         }
+        document.getElementById('user-display').innerText = currentProfile.full_name || currentUser.email;
+        document.getElementById('user-display').classList.remove('hidden');
+        document.getElementById('auth-btn').classList.add('hidden');
+        document.getElementById('logout-btn').classList.remove('hidden');
 
-        renderDashboard();
-      } catch (err) {
-        console.error('Error fetching profile:', err);
-        renderDashboard();
+        if (currentProfile.role === 'admin' || currentProfile.role === 'analyst') {
+          document.getElementById('admin-nav-link').classList.remove('hidden');
+        }
+      }
+      switchTab('home');
+    }
+
+    function switchTab(tab) {
+      const view = document.getElementById('app-view');
+      if (tab === 'home') {
+        view.innerHTML = `
+          <div class="text-center py-12">
+            <h1 class="text-4xl font-extrabold text-slate-900 mb-4" data-i18n="hero_title">${translations[currentLang].hero_title}</h1>
+            <p class="text-lg text-slate-600 max-w-3xl mx-auto mb-8" data-i18n="hero_subtitle">${translations[currentLang].hero_subtitle}</p>
+            <div class="flex justify-center space-x-4 mb-12">
+              <button onclick="switchTab('rates')" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg shadow transition" data-i18n="explore_rates">${translations[currentLang].explore_rates}</button>
+              <button onclick="switchTab('comparison')" class="bg-slate-800 hover:bg-slate-700 text-white font-semibold px-6 py-3 rounded-lg shadow transition" data-i18n="compare_banks">${translations[currentLang].compare_banks}</button>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 p-6 rounded-xl max-w-2xl mx-auto text-amber-900 text-sm">
+              <p class="font-semibold mb-1">🛡️ ADEY Intelligence Notice</p>
+              <span data-i18n="public_preview_notice">${translations[currentLang].public_preview_notice}</span>
+            </div>
+          </div>
+        `;
+      } else if (tab === 'rates') {
+        view.innerHTML = `
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <div class="flex justify-between items-center mb-6">
+              <h2 class="text-xl font-bold text-slate-900">National Bank of Ethiopia & All Commercial Banks FX Feed</h2>
+              <button onclick="triggerCollection()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 py-2 rounded-lg font-semibold">Run Live Collection Scraper</button>
+            </div>
+            <div id="rates-table-container">Loading verified FX data...</div>
+          </div>
+        `;
+        loadLiveRates();
+      } else if (tab === 'comparison') {
+        view.innerHTML = `
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h2 class="text-xl font-bold text-slate-900 mb-4">Comprehensive Commercial Bank Rate Comparison Matrix</h2>
+            <div id="comparison-matrix">Loading matrix...</div>
+          </div>
+        `;
+        loadBankComparison();
+      } else if (tab === 'importer') {
+        view.innerHTML = `
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-2xl mx-auto">
+            <h2 class="text-xl font-bold text-slate-900 mb-4">Importer Foreign Currency Invoice Calculator</h2>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Invoice Amount</label>
+                <input type="number" id="imp-amount" value="10000" class="w-full px-3 py-2 border rounded-lg text-sm">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Currency</label>
+                <select id="imp-curr" class="w-full px-3 py-2 border rounded-lg text-sm">
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="GBP">GBP - British Pound</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Assumed Selling Rate (ETB)</label>
+                <input type="number" id="imp-rate" value="126.80" class="w-full px-3 py-2 border rounded-lg text-sm">
+              </div>
+              <button onclick="calculateImporter()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm">Calculate ETB Equivalent & Scenarios</button>
+              <div id="imp-result" class="mt-4 p-4 bg-slate-50 border rounded-lg text-sm"></div>
+            </div>
+          </div>
+        `;
+      } else if (tab === 'exporter') {
+        view.innerHTML = `
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-2xl mx-auto">
+            <h2 class="text-xl font-bold text-slate-900 mb-4">Exporter Foreign Currency Revenue Calculator</h2>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Expected Export Proceeds</label>
+                <input type="number" id="exp-amount" value="25000" class="w-full px-3 py-2 border rounded-lg text-sm">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Currency</label>
+                <select id="exp-curr" class="w-full px-3 py-2 border rounded-lg text-sm">
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="GBP">GBP - British Pound</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Assumed Buying Rate (ETB)</label>
+                <input type="number" id="exp-rate" value="124.10" class="w-full px-3 py-2 border rounded-lg text-sm">
+              </div>
+              <button onclick="calculateExporter()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded-lg text-sm">Calculate ETB Revenue & Scenarios</button>
+              <div id="exp-result" class="mt-4 p-4 bg-slate-50 border rounded-lg text-sm"></div>
+            </div>
+          </div>
+        `;
+      } else if (tab === 'reports') {
+        view.innerHTML = `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h2 class="text-lg font-bold text-slate-800 mb-4">Available Reports & Subscriptions</h2>
+              <div class="space-y-4">
+                <div class="p-4 border rounded-lg flex justify-between items-center">
+                  <div>
+                    <h4 class="font-bold text-sm">ADEY Daily FX Report</h4>
+                    <p class="text-xs text-slate-500">ETB 500.00 &bull; Excel, PDF, Word</p>
+                  </div>
+                  <button onclick="orderReport('DAILY_FX_REP', 500)" class="bg-blue-600 text-white text-xs px-3 py-2 rounded font-medium">Order Report</button>
+                </div>
+                <div class="p-4 border rounded-lg flex justify-between items-center">
+                  <div>
+                    <h4 class="font-bold text-sm">ADEY Monthly Intelligence Subscription</h4>
+                    <p class="text-xs text-slate-500">ETB 5,000.00 &bull; 30 Days Full Access</p>
+                  </div>
+                  <button onclick="orderReport('MONTHLY_SUB', 5000)" class="bg-emerald-600 text-white text-xs px-3 py-2 rounded font-medium">Subscribe</button>
+                </div>
+              </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h2 class="text-lg font-bold text-slate-800 mb-4">Manual Payment & Receipt Submission</h2>
+              <p class="text-xs text-slate-600 mb-4">Make payment via Telebirr Merchant or CBE Bank Transfer, then submit your receipt details below for independent administrator verification.</p>
+              <div class="space-y-3 text-sm">
+                <div><strong>Telebirr Merchant:</strong> 987654 (ADEY Intelligence)</div>
+                <div><strong>CBE Account:</strong> 1000123456789 (Commercial Bank of Ethiopia)</div>
+                <hr class="my-2">
+                <div>
+                  <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Transaction Reference</label>
+                  <input type="text" id="pay-ref" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="TXN-9823749">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Amount Claimed (ETB)</label>
+                  <input type="number" id="pay-amount" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="500.00">
+                </div>
+                <button onclick="submitPaymentProof()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 rounded-lg text-sm">Submit Payment Receipt for Verification</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (tab === 'admin') {
+        view.innerHTML = `
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h2 class="text-xl font-bold text-amber-900 mb-4">🛡️ Administrator Management Console</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div class="bg-slate-50 p-4 border rounded-lg">
+                <h3 class="text-xs font-bold uppercase text-slate-500 mb-1">Data Collection</h3>
+                <button onclick="triggerCollection()" class="mt-2 bg-blue-600 text-white text-xs px-3 py-2 rounded">Run All Bank Scrapers</button>
+              </div>
+              <div class="bg-slate-50 p-4 border rounded-lg">
+                <h3 class="text-xs font-bold uppercase text-slate-500 mb-1">Download Reports</h3>
+                <div class="flex space-x-2 mt-2">
+                  <button onclick="downloadReport('xlsx')" class="bg-emerald-600 text-white text-xs px-2 py-1.5 rounded">Excel (.xlsx)</button>
+                  <button onclick="downloadReport('pdf')" class="bg-rose-600 text-white text-xs px-2 py-1.5 rounded">PDF (.pdf)</button>
+                  <button onclick="downloadReport('docx')" class="bg-indigo-600 text-white text-xs px-2 py-1.5 rounded">Word (.docx)</button>
+                </div>
+              </div>
+            </div>
+            <div id="admin-status-output" class="text-sm text-slate-600">Admin controls ready.</div>
+          </div>
+        `;
       }
     }
 
-    // --- RENDER AUTH VIEWS (Sign In / Sign Up) ---
-    function renderAuthView(mode = 'signin') {
-      document.getElementById('user-display').classList.add('hidden');
-      document.getElementById('logout-btn').classList.add('hidden');
+    async function loadLiveRates() {
+      const { data: rates, error } = await supabaseClient.from('fx_rates').select('*, fx_sources(source_name)').order('effective_date', { ascending: false }).limit(30);
+      const container = document.getElementById('rates-table-container');
+      if (error || !rates || rates.length === 0) {
+        container.innerHTML = '<p class="text-sm text-slate-500">No rates found in database. Click "Run Live Collection Scraper" above to populate rates.</p>';
+        return;
+      }
+      let html = '<div class="overflow-x-auto"><table class="w-full text-left border-collapse"><thead><tr class="bg-slate-100 text-slate-700 text-xs uppercase"><th class="p-3">Institution / Source</th><th class="p-3">Currency</th><th class="p-3">Rate Side</th><th class="p-3 text-right">Rate (ETB)</th><th class="p-3">Effective Date</th><th class="p-3">Status</th></tr></thead><tbody class="divide-y text-sm">';
+      rates.forEach(r => {
+        html += `<tr><td class="p-3 font-semibold">${r.fx_sources?.source_name || 'Bank'}</td><td class="p-3 font-bold text-blue-600">${r.currency_code}</td><td class="p-3">${r.rate_side}</td><td class="p-3 text-right font-mono">${Number(r.rate).toFixed(4)}</td><td class="p-3">${r.effective_date}</td><td class="p-3"><span class="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded">${r.verification_status}</span></td></tr>`;
+      });
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+    }
 
-      const container = document.getElementById('app-view');
-      container.innerHTML = `
-        <div class="max-w-md mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-          <div class="flex border-b border-slate-200 mb-6">
-            <button onclick="renderAuthView('signin')" class="w-1/2 pb-3 font-bold text-sm text-center border-b-2 ${mode === 'signin' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}">Sign In</button>
-            <button onclick="renderAuthView('signup')" class="w-1/2 pb-3 font-bold text-sm text-center border-b-2 ${mode === 'signup' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}">Register New</button>
-          </div>
+    async function loadBankComparison() {
+      const { data: rates } = await supabaseClient.from('fx_rates').select('*, fx_sources(source_name)').eq('currency_code', 'USD');
+      const container = document.getElementById('comparison-matrix');
+      if (!rates || rates.length === 0) {
+        container.innerHTML = '<p class="text-sm text-slate-500">No comparison data available yet. Please run the collection scraper.</p>';
+        return;
+      }
+      let html = '<div class="overflow-x-auto"><table class="w-full text-left border-collapse"><thead><tr class="bg-slate-100 text-slate-700 text-xs uppercase"><th class="p-3">Commercial Bank</th><th class="p-3 text-right">Buying Rate (ETB)</th><th class="p-3 text-right">Selling Rate (ETB)</th><th class="p-3">Effective Date</th></tr></thead><tbody class="divide-y text-sm">';
+      
+      const grouped = {};
+      rates.forEach(r => {
+        const bankName = r.fx_sources?.source_name || 'Unknown';
+        if (!grouped[bankName]) grouped[bankName] = {};
+        grouped[bankName][r.rate_side] = r.rate;
+        grouped[bankName].date = r.effective_date;
+      });
 
-          ${mode === 'signin' ? `
-            <div class="space-y-4">
-              <div>
-                <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Email Address</label>
-                <input type="email" id="signin-email" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="name@company.com">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Password</label>
-                <input type="password" id="signin-password" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="••••••••">
-              </div>
-              <button onclick="handleSignIn()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg text-sm transition shadow-sm">Sign In</button>
-            </div>
-          ` : `
-            <div class="space-y-4">
-              <div>
-                <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Full Name / Organization</label>
-                <input type="text" id="signup-name" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Habesha Financial PLC">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Email Address</label>
-                <input type="email" id="signup-email" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="name@company.com">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Password</label>
-                <input type="password" id="signup-password" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="••••••••">
-              </div>
-              <button onclick="handleSignUp()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg text-sm transition shadow-sm">Create Account</button>
-            </div>
-          `}
+      for (const [bank, vals] of Object.entries(grouped)) {
+        html += `<tr><td class="p-3 font-semibold">${bank}</td><td class="p-3 text-right font-mono">${vals.buy ? Number(vals.buy).toFixed(4) : '-'}</td><td class="p-3 text-right font-mono">${vals.sell ? Number(vals.sell).toFixed(4) : '-'}</td><td class="p-3">${vals.date || '-'}</td></tr>`;
+      }
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+    }
+
+    async function triggerCollection() {
+      const res = await fetch('/api/scrapers/collect', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Collection successful! Collected ${data.collected_records} verified rates across NBE and commercial banks.`);
+        loadLiveRates();
+      } else {
+        alert('Collection error: ' + (data.error || 'Unknown error'));
+      }
+    }
+
+    async function downloadReport(format) {
+      if (!currentUser) { alert('Please log in first.'); openAuthModal(); return; }
+      const res = await fetch('/api/reports/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report_type: 'DAILY_FX_REP', format, customer_id: currentUser.id })
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ADEY_FX_Report.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } else {
+        alert('Report generation failed or access unauthorized.');
+      }
+    }
+
+    function calculateImporter() {
+      const amt = parseFloat(document.getElementById('imp-amount').value) || 0;
+      const rate = parseFloat(document.getElementById('imp-rate').value) || 0;
+      const total = amt * rate;
+      document.getElementById('imp-result').innerHTML = `
+        <div class="space-y-1">
+          <div><strong>Standard ETB Equivalent:</strong> ${total.toLocaleString(undefined, {minimumFractionDigits: 2})} ETB</div>
+          <div><strong>Scenario (+2% Volatility):</strong> ${(total * 1.02).toLocaleString(undefined, {minimumFractionDigits: 2})} ETB</div>
+          <div><strong>Scenario (-2% Volatility):</strong> ${(total * 0.98).toLocaleString(undefined, {minimumFractionDigits: 2})} ETB</div>
         </div>
       `;
     }
 
-    // --- AUTH ACTIONS ---
-    async function handleSignIn() {
-      const email = document.getElementById('signin-email').value;
-      const password = document.getElementById('signin-password').value;
-      if (!email || !password) { alert('Please enter email and password.'); return; }
+    function calculateExporter() {
+      const amt = parseFloat(document.getElementById('exp-amount').value) || 0;
+      const rate = parseFloat(document.getElementById('exp-rate').value) || 0;
+      const total = amt * rate;
+      document.getElementById('exp-result').innerHTML = `
+        <div class="space-y-1">
+          <div><strong>Standard ETB Revenue:</strong> ${total.toLocaleString(undefined, {minimumFractionDigits: 2})} ETB</div>
+          <div><strong>Scenario (+2% Rate):</strong> ${(total * 1.02).toLocaleString(undefined, {minimumFractionDigits: 2})} ETB</div>
+          <div><strong>Scenario (-2% Rate):</strong> ${(total * 0.98).toLocaleString(undefined, {minimumFractionDigits: 2})} ETB</div>
+        </div>
+      `;
+    }
 
-      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) {
-        alert('Login failed: ' + error.message);
+    async function orderReport(productCode, price) {
+      if (!currentUser) { alert('Please log in first.'); openAuthModal(); return; }
+      const { data, error } = await supabaseClient.from('orders').insert({
+        customer_id: currentUser.id,
+        product_id: (await supabaseClient.from('products').select('id').eq('product_code', productCode).single()).data.id,
+        amount: price,
+        status: 'pending_payment'
+      }).select().single();
+
+      if (error) alert('Order error: ' + error.message);
+      else { alert('Order created! Please complete payment and submit your receipt reference in the payment section.'); switchTab('reports'); }
+    }
+
+    async function submitPaymentProof() {
+      if (!currentUser) { alert('Please log in first.'); return; }
+      const ref = document.getElementById('pay-ref').value;
+      const amt = parseFloat(document.getElementById('pay-amount').value);
+      if (!ref || !amt) { alert('Please enter transaction reference and amount.'); return; }
+
+      const { data: order } = await supabaseClient.from('orders').select('id').eq('customer_id', currentUser.id).eq('status', 'pending_payment').limit(1).single();
+      if (!order) { alert('No pending order found. Please order a report first.'); return; }
+
+      const { error } = await supabaseClient.from('payment_submissions').insert({
+        order_id: order.id,
+        customer_id: currentUser.id,
+        payment_method: 'bank_transfer',
+        transaction_reference: ref,
+        receipt_path: 'receipts/mock_receipt.png',
+        amount_claimed: amt,
+        status: 'submitted'
+      });
+
+      if (error) alert('Submission failed: ' + error.message);
+      else { alert('Payment receipt submitted successfully! Awaiting administrator verification.'); }
+    }
+
+    function openAuthModal() { document.getElementById('auth-modal').classList.remove('hidden'); setAuthMode('signin'); }
+    function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
+    function setAuthMode(mode) {
+      const container = document.getElementById('auth-form-container');
+      if (mode === 'signin') {
+        document.getElementById('tab-signin').className = "w-1/2 pb-3 font-bold text-sm text-center border-b-2 border-amber-500 text-amber-600";
+        document.getElementById('tab-signup').className = "w-1/2 pb-3 font-bold text-sm text-center border-b-2 border-transparent text-slate-400";
+        container.innerHTML = `
+          <div class="space-y-4 mt-4">
+            <input type="email" id="auth-email" placeholder="Email Address" class="w-full px-3 py-2 border rounded-lg text-sm">
+            <input type="password" id="auth-pass" placeholder="Password" class="w-full px-3 py-2 border rounded-lg text-sm">
+            <button onclick="handleSignIn()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg text-sm">Sign In</button>
+          </div>
+        `;
       } else {
-        currentUser = data.user;
-        await fetchProfileAndRender();
+        document.getElementById('tab-signup').className = "w-1/2 pb-3 font-bold text-sm text-center border-b-2 border-amber-500 text-amber-600";
+        document.getElementById('tab-signin').className = "w-1/2 pb-3 font-bold text-sm text-center border-b-2 border-transparent text-slate-400";
+        container.innerHTML = `
+          <div class="space-y-4 mt-4">
+            <input type="text" id="auth-name" placeholder="Full Name / Organization" class="w-full px-3 py-2 border rounded-lg text-sm">
+            <input type="email" id="auth-email" placeholder="Email Address" class="w-full px-3 py-2 border rounded-lg text-sm">
+            <input type="password" id="auth-pass" placeholder="Password" class="w-full px-3 py-2 border rounded-lg text-sm">
+            <button onclick="handleSignUp()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg text-sm">Create Account</button>
+          </div>
+        `;
       }
     }
 
+    async function handleSignIn() {
+      const email = document.getElementById('auth-email').value;
+      const pass = document.getElementById('auth-pass').value;
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
+      if (error) alert('Login failed: ' + error.message);
+      else { window.location.reload(); }
+    }
+
     async function handleSignUp() {
-      const name = document.getElementById('signup-name').value;
-      const email = document.getElementById('signup-email').value;
-      const password = document.getElementById('signup-password').value;
-      if (!name || !email || !password) { alert('Please complete all fields.'); return; }
-
-      const { data, error } = await supabaseClient.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: name } }
-      });
-
-      if (error) {
-        alert('Registration failed: ' + error.message);
-      } else {
-        alert('Registration successful! Please check your email for confirmation or log in.');
-        renderAuthView('signin');
-      }
+      const name = document.getElementById('auth-name').value;
+      const email = document.getElementById('auth-email').value;
+      const pass = document.getElementById('auth-pass').value;
+      const { data, error } = await supabaseClient.auth.signUp({ email, password: pass, options: { data: { full_name: name, preferred_language: currentLang } } });
+      if (error) alert('Registration failed: ' + error.message);
+      else { alert('Registration successful! Please sign in.'); setAuthMode('signin'); }
     }
 
     async function logout() {
       await supabaseClient.auth.signOut();
-      currentUser = null;
-      currentProfile = null;
       window.location.reload();
-    }
-
-    // --- RENDER DASHBOARD (Customer vs Admin) ---
-    async function renderDashboard() {
-      document.getElementById('user-display').innerText = currentUser.email;
-      document.getElementById('user-display').classList.remove('hidden');
-      document.getElementById('logout-btn').classList.remove('hidden');
-
-      const isAdmin = currentProfile && (currentProfile.role === 'admin' || currentProfile.role === 'analyst');
-      const container = document.getElementById('app-view');
-
-      if (isAdmin) {
-        container.innerHTML = `
-          <div class="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex justify-between items-center">
-            <div>
-              <h2 class="text-lg font-bold text-amber-900">🛡️ Administrator Management Console</h2>
-              <p class="text-xs text-amber-700">Logged in as <strong>${currentUser.email}</strong> (Role: <span class="uppercase font-semibold">${currentProfile.role}</span>)</p>
-            </div>
-            <button onclick="loadAdminStats()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition">Refresh Data</button>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-              <h3 class="text-xs font-semibold text-slate-500 uppercase mb-2">FX Rates Database</h3>
-              <p class="text-2xl font-black text-slate-800" id="stat-rates">Loading...</p>
-              <button onclick="openAddRateModal()" class="mt-4 text-xs bg-blue-50 text-blue-600 font-semibold px-3 py-1.5 rounded hover:bg-blue-100">+ Add New FX Rate</button>
-            </div>
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-              <h3 class="text-xs font-semibold text-slate-500 uppercase mb-2">Pending Payments</h3>
-              <p class="text-2xl font-black text-amber-600" id="stat-payments">Loading...</p>
-              <button onclick="loadPendingPayments()" class="mt-4 text-xs bg-amber-50 text-amber-700 font-semibold px-3 py-1.5 rounded hover:bg-amber-100">Review Submissions</button>
-            </div>
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-              <h3 class="text-xs font-semibold text-slate-500 uppercase mb-2">Registered Users</h3>
-              <p class="text-2xl font-black text-emerald-600" id="stat-users">Loading...</p>
-              <button onclick="loadUserList()" class="mt-4 text-xs bg-emerald-50 text-emerald-700 font-semibold px-3 py-1.5 rounded hover:bg-emerald-100">Manage Users</button>
-            </div>
-          </div>
-
-          <div id="admin-action-output" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 class="text-lg font-bold text-slate-800 mb-4">Live FX Rates & Institutional Feed</h3>
-            <div id="admin-data-table">Loading rates...</div>
-          </div>
-        `;
-        loadAdminStats();
-      } else {
-        container.innerHTML = `
-          <div class="mb-6 bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex justify-between items-center">
-            <div>
-              <h2 class="text-lg font-bold text-emerald-900">Welcome, ${currentProfile.full_name || currentUser.email}</h2>
-              <p class="text-xs text-emerald-700">Customer Access Level &bull; Subscribed to Ethiopian FX Market Feeds</p>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h3 class="text-lg font-bold text-slate-800 mb-4">Official Ethiopian Foreign Exchange Rates</h3>
-              <div id="customer-rates-table">Loading live market data...</div>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h3 class="text-lg font-bold text-slate-800 mb-4">Subscription & Intelligence Reports</h3>
-              <p class="text-sm text-slate-600 mb-4">Unlock full analytical breakdown, historical trends, and CSV/Excel exports.</p>
-              <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg mb-4">
-                <span class="text-xs font-bold uppercase text-slate-500 block mb-1">Active Plan</span>
-                <span class="text-base font-bold text-blue-600">Standard Public Preview (Free)</span>
-              </div>
-              <button onclick="alert('Payment submission integration active. Contact admin for premium upgrade invoice.')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg text-sm transition">Upgrade to Premium Feed (ETB 5,000/mo)</button>
-            </div>
-          </div>
-        `;
-        loadCustomerRates();
-      }
-    }
-
-    // --- ADMIN ACTIONS & API ---
-    async function loadAdminStats() {
-      const { count: ratesCount } = await supabaseClient.from('fx_rates').select('*', { count: 'exact', head: true });
-      const { count: paymentsCount } = await supabaseClient.from('payment_submissions').select('*', { count: 'exact', head: true }).eq('status', 'submitted');
-      const { count: usersCount } = await supabaseClient.from('profiles').select('*', { count: 'exact', head: true });
-
-      document.getElementById('stat-rates').innerText = ratesCount || 0;
-      document.getElementById('stat-payments').innerText = paymentsCount || 0;
-      document.getElementById('stat-users').innerText = usersCount || 0;
-
-      loadAdminRatesTable();
-    }
-
-    async function loadAdminRatesTable() {
-      const { data: rates, error } = await supabaseClient
-        .from('fx_rates')
-        .select('id, currency_code, rate_type, rate_side, rate, effective_date, is_public_preview')
-        .order('effective_date', { ascending: false })
-        .limit(10);
-
-      const tableDiv = document.getElementById('admin-data-table');
-      if (error || !rates || rates.length === 0) {
-        tableDiv.innerHTML = '<p class="text-sm text-slate-500">No FX rates recorded yet in database.</p>';
-        return;
-      }
-
-      let html = `
-        <div class="flex justify-between items-center mb-4">
-          <h4 class="font-bold text-sm text-slate-700">Recent Exchange Rates</h4>
-          <button onclick="openAddRateModal()" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">+ Add Rate</button>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="bg-slate-100 text-slate-700 text-xs uppercase tracking-wider">
-                <th class="p-2.5">Date</th>
-                <th class="p-2.5">Currency</th>
-                <th class="p-2.5">Type</th>
-                <th class="p-2.5">Side</th>
-                <th class="p-2.5 text-right">Rate (ETB)</th>
-                <th class="p-2.5 text-center">Preview</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 text-sm">
-      `;
-      rates.forEach(r => {
-        html += `
-          <tr>
-            <td class="p-2.5">${r.effective_date}</td>
-            <td class="p-2.5 font-bold text-blue-600">${r.currency_code}</td>
-            <td class="p-2.5">${r.rate_type}</td>
-            <td class="p-2.5">${r.rate_side}</td>
-            <td class="p-2.5 text-right font-mono font-semibold">${Number(r.rate).toFixed(4)}</td>
-            <td class="p-2.5 text-center">${r.is_public_preview ? '<span class="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded">Yes</span>' : 'No'}</td>
-          </tr>
-        `;
-      });
-      html += '</tbody></table></div>';
-      tableDiv.innerHTML = html;
-    }
-
-    async function loadCustomerRates() {
-      const { data: rates, error } = await supabaseClient
-        .from('fx_rates')
-        .select('*')
-        .order('effective_date', { ascending: false })
-        .limit(10);
-
-      const div = document.getElementById('customer-rates-table');
-      if (error || !rates || rates.length === 0) {
-        div.innerHTML = `
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="bg-slate-100 text-slate-700 text-xs uppercase tracking-wider">
-                  <th class="p-3">Institution</th>
-                  <th class="p-3">Currency</th>
-                  <th class="p-3">Rate Type</th>
-                  <th class="p-3 text-right">Rate (ETB)</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100 text-sm">
-                <tr><td class="p-3">National Bank of Ethiopia</td><td class="p-3 font-bold">USD</td><td class="p-3">Reference</td><td class="p-3 text-right font-mono">125.4321</td></tr>
-                <tr><td class="p-3">Commercial Bank of Ethiopia</td><td class="p-3 font-bold">USD</td><td class="p-3">Buying</td><td class="p-3 text-right font-mono">124.1000</td></tr>
-              </tbody>
-            </table>
-          </div>
-        `;
-        return;
-      }
-
-      let html = '<div class="overflow-x-auto"><table class="w-full text-left border-collapse"><thead><tr class="bg-slate-100 text-slate-700 text-xs uppercase tracking-wider"><th class="p-3">Date</th><th class="p-3">Currency</th><th class="p-3">Side</th><th class="p-3 text-right">Rate (ETB)</th></tr></thead><tbody class="divide-y divide-slate-100 text-sm">';
-      rates.forEach(r => {
-        html += `<tr><td class="p-3">${r.effective_date}</td><td class="p-3 font-bold text-blue-600">${r.currency_code}</td><td class="p-3">${r.rate_side}</td><td class="p-3 text-right font-mono">${Number(r.rate).toFixed(4)}</td></tr>`;
-      });
-      html += '</tbody></table></div>';
-      div.innerHTML = html;
-    }
-
-    async function openAddRateModal() {
-      const currency = prompt("Enter Currency Code (e.g. USD, EUR, GBP):", "USD");
-      if (!currency) return;
-      const rateVal = prompt("Enter Exchange Rate in ETB:", "125.00");
-      if (!rateVal) return;
-
-      const { data: sources } = await supabaseClient.from('fx_sources').select('id').limit(1);
-      if (!sources || sources.length === 0) {
-        alert('Please create an FX source in database first.');
-        return;
-      }
-
-      const { error } = await supabaseClient.from('fx_rates').insert({
-        source_id: sources[0].id,
-        currency_code: currency.toUpperCase(),
-        rate_type: 'indicative',
-        rate_side: 'reference',
-        rate: parseFloat(rateVal),
-        effective_date: new Date().toISOString().split('T')[0],
-        source_url: 'https://nbe.gov.et',
-        is_public_preview: true
-      });
-
-      if (error) {
-        alert('Error adding rate: ' + error.message);
-      } else {
-        alert('FX Rate successfully added!');
-        loadAdminStats();
-      }
     }
 
     initApp();
